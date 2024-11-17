@@ -122,8 +122,13 @@ class TssWrapper:
     self.log.info('Getting hcl report from vTPM...')
 
     if user_data:
+      self.log.info('User data index: hashing provided user data')
       hash_bytes = sha512(json.dumps(user_data).encode('utf-8')).digest()
       self.write_to_nv_index(HCL_USER_DATA_INDEX, hash_bytes)
+    else:
+      self.log.info('User data index: hashing default user data')
+      default_bytes = sha512(b'Hello world').digest()
+      self.write_to_nv_index(HCL_USER_DATA_INDEX, default_bytes)
 
     # read hcl report from nv index
     hcl_report = self.read_nv_index(HCL_REPORT_INDEX)
