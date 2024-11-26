@@ -52,11 +52,12 @@ def attest(c, t):
   provider_tag = config_json['attestation_provider']
   endpoint = config_json['attestation_url']
   api_key = config_json['api_key']
+  user_claims = config_json['claims']
 
   # Build attestation client parameters
   isolation_type = IsolationTypeLookup.get(provider_tag, IsolationTypeLookup['default'])
   provider = AttestationProviderLookup.get(provider_tag, AttestationProviderLookup['default'])
-  client_parameters = AttestationClientParameters(endpoint, provider, isolation_type, api_key) 
+  client_parameters = AttestationClientParameters(endpoint, provider, isolation_type, user_claims, api_key) 
 
   # Attest based on user configuration
   attestation_client = AttestationClient(logger, client_parameters)

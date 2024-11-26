@@ -225,6 +225,8 @@ class AttestationClient():
     while retries < max_retries:
       try:
         self.log.info('Attesting Platform Evidence...')
+        self.log.info('User Claims:')
+        self.log.info(self.parameters.user_claims)
 
         tss_wrapper = TssWrapper(self.log)
         isolation_type = self.parameters.isolation_type
@@ -236,6 +238,7 @@ class AttestationClient():
 
         # Set request data based on the platform
         encoded_report = Encoder.base64url_encode(hw_report)
+
         encoded_runtime_data = Encoder.base64url_encode(runtime_data)
         encoded_token = ""
         encoded_hw_evidence = ""
@@ -254,6 +257,9 @@ class AttestationClient():
           encoded_hw_evidence = Encoder.base64url_encode(snp_report)
         else:
           self.log.info('Invalid Hardware Report Type')
+
+        self.log.info('Platform Quote/Report:')
+        self.log.info(encoded_hw_evidence)
 
         # verify hardware evidence
         encoded_token = self.provider.attest_platform(encoded_hw_evidence, encoded_runtime_data)
