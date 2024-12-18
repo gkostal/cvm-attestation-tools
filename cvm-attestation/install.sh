@@ -29,10 +29,15 @@ retry_command sudo apt-get update
 echo "Installing tpm2-tools and Python..."
 retry_command sudo apt-get install -y tpm2-tools python3 python3-pip
 
+# Create a virtual Python environment to avoid affecting the system managed
+# python installation
+python3 -m venv myenv
+source myenv/bin/activate
+
 # Install Python packages
 echo "Installing Python requirements..."
-retry_command sudo -H pip3 install --upgrade pip
-retry_command sudo -H pip3 install -r requirements.txt
+retry_command pip3 install --upgrade pip
+retry_command pip3 install -r requirements.txt
 
 # Install CLI tool
 echo "Installing CLI tool..."
