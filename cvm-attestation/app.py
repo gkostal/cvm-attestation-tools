@@ -33,8 +33,8 @@ def attest_platform():
 def generate_hw_evidence():
     try:
         # Call the generate HW evidence method
-        token = attestation_client.generate_hw_evidence()
-        return jsonify({"token": token}), 200
+        evidence = attestation_client.generate_hw_evidence()
+        return jsonify({"evidence": evidence}), 200
     except Exception as e:
         logger.error(f"Error during attestation: {str(e)}")
         return jsonify({"error": str(e)}), 500
