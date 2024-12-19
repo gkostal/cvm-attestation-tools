@@ -124,7 +124,10 @@ class TssWrapper:
     if user_data:
       hash_bytes = sha512(json.dumps(user_data).encode('utf-8')).digest()
       self.write_to_nv_index(HCL_USER_DATA_INDEX, hash_bytes)
-
+    else:
+      zero_bytes = bytearray(64)
+      self.write_to_nv_index(HCL_USER_DATA_INDEX, zero_bytes)
+    
     # read hcl report from nv index
     hcl_report = self.read_nv_index(HCL_REPORT_INDEX)
 
