@@ -322,7 +322,6 @@ class AttestationClient():
         encoded_report = Encoder.base64url_encode(hw_report)
 
         encoded_runtime_data = Encoder.base64url_encode(runtime_data)
-        encoded_token = ""
         encoded_hw_evidence = ""
 
         imds_client = ImdsClient(self.log)
@@ -343,7 +342,12 @@ class AttestationClient():
         self.log.info('Platform Quote/Report:')
         self.log.info(encoded_hw_evidence)
         
-        return encoded_hw_evidence
+        all_hw_evidence = {
+          'HardwareType': report_type,
+          'HardwareEvidence': encoded_hw_evidence,
+          'RuntimeData': encoded_runtime_data
+        }
+        return json.dumps(all_hw_evidence)
         
       except RequestException as e:
         self.log.error(f"Request to attest platform failed with an exception: {e}")
