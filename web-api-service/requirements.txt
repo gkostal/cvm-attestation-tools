@@ -1,0 +1,13 @@
+# Flask web API dependencies
+flask
+flask-restx
+flask-cors
+
+# Core AttestationClient dependencies (from ../cvm-attestation/requirements.txt)
+requests
+pytest
+pytest-mock
+Click
+pyjwt
+cryptography
+construct
