@@ -1,0 +1,1 @@
+docker build --pull -f Dockerfile.runtime -t python-web-api-slim ..

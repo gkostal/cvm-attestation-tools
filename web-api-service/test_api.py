@@ -31,10 +31,18 @@ def test_attestation_endpoint(endpoint_path, test_name):
     """Test an attestation endpoint."""
     print(f"\nTesting {test_name}...")
     
+    # Set endpoint based on test type
+    if "Guest" in test_name:
+        endpoint_url = "https://sharedeus.eus.attest.azure.net/attest/AzureGuest?api-version=2020-10-01"
+    elif "Platform" in test_name:
+        endpoint_url = "https://sharedeus.eus.attest.azure.net/attest/SevSnpVm?api-version=2022-08-01"
+    else:  # Hardware Evidence
+        endpoint_url = "https://sharedeus.eus.attest.azure.net/attest/SevSnpVm?api-version=2022-08-01"
+    
     # Sample request data
     test_data = {
-        "endpoint": "https://example-maa-endpoint.com",
-        "isolation_type": "TDX",
+        "endpoint": endpoint_url,
+        "isolation_type": "SEV_SNP",
         "claims": {"test": "data"}
     }
     
@@ -54,9 +62,17 @@ def test_attestation_endpoint(endpoint_path, test_name):
             if 'error' in result:
                 print(f"Error: {result['error']}")
             
+            # Print token if present and successful
+            if result.get('success') and 'token' in result:
+                print(f"Token: {result['token']}")
+            
+            # Print evidence if present and successful
+            if result.get('success') and 'evidence' in result:
+                print(f"Evidence: {result['evidence']}")
+            
             if 'logs' in result and result['logs']:
                 print("Logs:")
-                for log in result['logs'][-3:]:  # Show last 3 log entries
+                for log in result['logs'][-20:]:
                     print(f"  {log}")
             
             return response.status_code < 400

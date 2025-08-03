@@ -14,6 +14,6 @@ IF %ERRORLEVEL% EQU 0 (
     docker run -dit ^
         --name web-api-dev ^
         --restart unless-stopped ^
-        ubuntu:24.04 ^
-        bash
+        -p 5000:5000 ^
+        web-api-dev-with-tools
 )

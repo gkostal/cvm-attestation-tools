@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pygencvm-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pygencvm-containers
+  template:
+    metadata:
+      labels:
+        app: pygencvm-containers
+    spec:
+      containers:
+      - name: pygencvm-container
+        image: gnkdev.azurecr.io/python-web-api-slim
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 50052
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+            - SYS_ADMIN
+        volumeMounts:
+        - mountPath: /sys/kernel/security
+          name: security-volume
+      volumes:
+      - name: security-volume
+        hostPath:
+          path: /sys/kernel/security
+          type: Directory
+      nodeSelector:
+        agentpool: amdcvmpool
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pygencvm-service
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 50060
+    targetPort: 5000
+  selector:
+    app: pygencvm-containers
