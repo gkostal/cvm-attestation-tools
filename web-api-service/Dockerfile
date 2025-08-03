@@ -1,6 +1,6 @@
 FROM ubuntu:24.04
 
-# Avoid prompts during package operations
+# Avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Update, upgrade, and install required packages
