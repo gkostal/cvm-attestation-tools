@@ -1,0 +1,211 @@
+{
+  "swagger": "2.0",
+  "basePath": "/",
+  "paths": {
+    "/api/v1/attest/guest": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/AttestationResponse"
+            }
+          }
+        },
+        "summary": "Attest the guest (hardware and guest evidence)",
+        "operationId": "post_attest_guest",
+        "parameters": [
+          {
+            "name": "payload",
+            "required": true,
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/AttestationRequest"
+            }
+          },
+          {
+            "name": "X-Fields",
+            "in": "header",
+            "type": "string",
+            "format": "mask",
+            "description": "An optional fields mask"
+          }
+        ],
+        "tags": [
+          "api/v1"
+        ]
+      }
+    },
+    "/api/v1/attest/platform": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/AttestationResponse"
+            }
+          }
+        },
+        "summary": "Attest the platform (hardware evidence only)",
+        "operationId": "post_attest_platform",
+        "parameters": [
+          {
+            "name": "payload",
+            "required": true,
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/AttestationRequest"
+            }
+          },
+          {
+            "name": "X-Fields",
+            "in": "header",
+            "type": "string",
+            "format": "mask",
+            "description": "An optional fields mask"
+          }
+        ],
+        "tags": [
+          "api/v1"
+        ]
+      }
+    },
+    "/api/v1/hardware-evidence": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/HardwareEvidenceResponse"
+            }
+          }
+        },
+        "summary": "Get hardware evidence",
+        "operationId": "post_get_hardware_evidence",
+        "parameters": [
+          {
+            "name": "payload",
+            "required": true,
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/AttestationRequest"
+            }
+          },
+          {
+            "name": "X-Fields",
+            "in": "header",
+            "type": "string",
+            "format": "mask",
+            "description": "An optional fields mask"
+          }
+        ],
+        "tags": [
+          "api/v1"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "CVM Attestation API",
+    "version": "1.0",
+    "description": "REST API for CVM Attestation operations"
+  },
+  "produces": [
+    "application/json"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "tags": [
+    {
+      "name": "api/v1",
+      "description": "Attestation operations"
+    }
+  ],
+  "definitions": {
+    "AttestationRequest": {
+      "required": [
+        "endpoint",
+        "isolation_type"
+      ],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "description": "Attestation endpoint URL"
+        },
+        "isolation_type": {
+          "type": "string",
+          "description": "Isolation type",
+          "example": "TDX",
+          "enum": [
+            "TDX",
+            "SEV_SNP",
+            "TRUSTED_LAUNCH",
+            "UNDEFINED"
+          ]
+        },
+        "claims": {
+          "type": "object",
+          "description": "Optional user claims"
+        }
+      },
+      "type": "object"
+    },
+    "AttestationResponse": {
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the operation was successful"
+        },
+        "token": {
+          "type": "string",
+          "description": "Attestation token (if successful)"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message (if failed)"
+        },
+        "logs": {
+          "type": "array",
+          "description": "Log messages from the operation",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "type": "object"
+    },
+    "HardwareEvidenceResponse": {
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the operation was successful"
+        },
+        "evidence": {
+          "type": "object",
+          "description": "Hardware evidence data (if successful)"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message (if failed)"
+        },
+        "logs": {
+          "type": "array",
+          "description": "Log messages from the operation",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "type": "object"
+    }
+  },
+  "responses": {
+    "ParseError": {
+      "description": "When a mask can't be parsed"
+    },
+    "MaskError": {
+      "description": "When any error occurs on mask"
+    }
+  }
+}
