@@ -38,7 +38,7 @@ def test_attestation_endpoint(endpoint_path, test_name, vm_type):
     elif "Platform" in test_name:
         endpoint_url = "https://sharedeus.eus.attest.azure.net/attest/SevSnpVm?api-version=2022-08-01"
     else:  # Hardware Evidence
-        endpoint_url = ""
+        endpoint_url = "https://hardware.evidence.com"
     
     # Set isolation type based on VM type
     isolation_type = "SEV_SNP" if vm_type == "CVM" else "TRUSTED_LAUNCH"
