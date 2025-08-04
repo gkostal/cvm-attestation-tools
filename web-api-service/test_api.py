@@ -11,6 +11,7 @@ Simple test script for the CVM Attestation Web API.
 import requests
 import json
 import sys
+import argparse
 
 # API base URL
 BASE_URL = "http://localhost:5000"
@@ -27,7 +28,7 @@ def test_health_check():
         print(f"Health check failed: {e}")
         return False
 
-def test_attestation_endpoint(endpoint_path, test_name):
+def test_attestation_endpoint(endpoint_path, test_name, vm_type):
     """Test an attestation endpoint."""
     print(f"\nTesting {test_name}...")
     
@@ -37,12 +38,15 @@ def test_attestation_endpoint(endpoint_path, test_name):
     elif "Platform" in test_name:
         endpoint_url = "https://sharedeus.eus.attest.azure.net/attest/SevSnpVm?api-version=2022-08-01"
     else:  # Hardware Evidence
-        endpoint_url = "https://sharedeus.eus.attest.azure.net/attest/SevSnpVm?api-version=2022-08-01"
+        endpoint_url = ""
+    
+    # Set isolation type based on VM type
+    isolation_type = "SEV_SNP" if vm_type == "CVM" else "TRUSTED_LAUNCH"
     
     # Sample request data
     test_data = {
         "endpoint": endpoint_url,
-        "isolation_type": "SEV_SNP",
+        "isolation_type": isolation_type,
         "claims": {"test": "data"}
     }
     
@@ -98,16 +102,44 @@ def test_swagger_docs():
 
 def main():
     """Run all tests."""
-    print("CVM Attestation Web API Test Suite")
-    print("=" * 40)
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="CVM Attestation Web API Test Suite",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=""":
+Examples:
+  python test_api.py --vm-type CVM     # Test all CVM functionality
+  python test_api.py --vm-type TVM     # Test TVM functionality (guest attestation only)
+        """
+    )
+    parser.add_argument(
+        '--vm-type',
+        choices=['CVM', 'TVM'],
+        required=True,
+        help='VM type to test: CVM (Confidential VM) or TVM (Trusted VM)'
+    )
     
-    tests = [
-        ("Health Check", test_health_check),
-        ("Swagger Docs", test_swagger_docs),
-        ("Guest Attestation", lambda: test_attestation_endpoint("/api/v1/attest/guest", "Guest Attestation")),
-        ("Platform Attestation", lambda: test_attestation_endpoint("/api/v1/attest/platform", "Platform Attestation")),
-        ("Hardware Evidence", lambda: test_attestation_endpoint("/api/v1/hardware-evidence", "Hardware Evidence")),
-    ]
+    args = parser.parse_args()
+    vm_type = args.vm_type
+    
+    print(f"CVM Attestation Web API Test Suite - {vm_type} Mode")
+    print("=" * 50)
+    
+    # Define tests based on VM type
+    if vm_type == "CVM":
+        tests = [
+            ("Health Check", test_health_check),
+            ("Swagger Docs", test_swagger_docs),
+            ("Guest Attestation", lambda: test_attestation_endpoint("/api/v1/attest/guest", "Guest Attestation", vm_type)),
+            ("Platform Attestation", lambda: test_attestation_endpoint("/api/v1/attest/platform", "Platform Attestation", vm_type)),
+            ("Hardware Evidence", lambda: test_attestation_endpoint("/api/v1/hardware-evidence", "Hardware Evidence", vm_type)),
+        ]
+    else:  # TVM
+        tests = [
+            ("Health Check", test_health_check),
+            ("Swagger Docs", test_swagger_docs),
+            ("Guest Attestation", lambda: test_attestation_endpoint("/api/v1/attest/guest", "Guest Attestation", vm_type)),
+        ]
     
     results = []
     for test_name, test_func in tests:
@@ -118,7 +150,7 @@ def main():
             print(f"Test {test_name} failed with exception: {e}")
             results.append((test_name, False))
     
-    print("\n" + "=" * 40)
+    print("\n" + "=" * 50)
     print("Test Results:")
     for test_name, result in results:
         status = "PASS" if result else "FAIL"
