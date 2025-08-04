@@ -31,11 +31,12 @@ PROTOCOL_VERSION = "2.0"
 
 
 class GuestAttestationParameters:
-  def __init__(self, os_info=None, tcg_logs=None, tpm_info=None, isolation=None):
+  def __init__(self, os_info=None, tcg_logs=None, tpm_info=None, isolation=None, claims = None):
     self.os_info = os_info
     self.tcg_logs = tcg_logs
     self.tpm_info = tpm_info
     self.isolation = isolation
+    self.user_claims = claims
   
   def toJson(self):
     return json.dumps({
@@ -46,7 +47,7 @@ class GuestAttestationParameters:
       'OSVersionMinor': str(self.os_info.minor_version),
       'OSBuild': Encoder.base64_encode_string(self.os_info.build),
       'TcgLogs': Encoder.base64_encode(self.tcg_logs),
-      'ClientPayload': Encoder.base64_encode_string(""),
+      'ClientPayload': self.user_claims if self.user_claims else {},
       'TpmInfo': self.tpm_info.get_values(),
       'IsolationInfo': self.isolation.get_values()
     })
@@ -215,7 +216,7 @@ class AttestationClient():
         tpm_info = TpmInfo(aik_cert, aik_pub, pcr_quote, sig, pcr_values, key)
         tcg_logs = get_measurements(os_info.type)
         isolation = Isolation(self.parameters.isolation_type, isolation_evidence)
-        param = GuestAttestationParameters(os_info, tcg_logs, tpm_info, isolation)
+        param = GuestAttestationParameters(os_info, tcg_logs, tpm_info, isolation, self.parameters.user_claims)
 
         # Calls attestation provider with the guest evidence
         request = {
