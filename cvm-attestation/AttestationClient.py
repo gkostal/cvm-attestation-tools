@@ -173,36 +173,29 @@ class AttestationClient():
         self.log.info('Attesting Guest Evidence...')
 
         # get the isolation information for the platform
-        isolation_evidence = ""
-
         isolation_type = self.parameters.isolation_type
         self.log.info(f'Processing {isolation_type.name} attestation...')
 
-        self.log.info(f'Processing {isolation_type.name} attestation...')
-        if isolation_type == IsolationType.SEV_SNP:
-          # SEV_SNP specific code
-          isolation_evidence = self.get_hardware_evidence()
-          hw_report = isolation_evidence.hardware_report   # td_quote or snp report
-          runtime_data = isolation_evidence.runtime_data
-          report_type = isolation_evidence.type
-          imds_client = ImdsClient(self.log)
-          cert_chain = imds_client.get_vcek_certificate()
-          isolation_evidence = SnpEvidence(hw_report, runtime_data, cert_chain)
-
-        elif isolation_type == IsolationType.TDX:
-          # TDX specific code
-          isolation_evidence = self.get_hardware_evidence()
-          hw_report = isolation_evidence.hardware_report   # td_quote or snp report
-          runtime_data = isolation_evidence.runtime_data
-          report_type = isolation_evidence.type
-          isolation_evidence = TdxEvidence(hw_report, runtime_data)
-
-        elif isolation_type == IsolationType.TRUSTED_LAUNCH:
+        # Get isolation evidence based on type
+        if isolation_type == IsolationType.TRUSTED_LAUNCH:
           # Trusted Launch specific code
           isolation_evidence = TrustedLaunchEvidence()
 
+        elif isolation_type in [IsolationType.SEV_SNP, IsolationType.TDX]:
+          # Get hardware evidence for CVM types (SEV_SNP and TDX)
+          hardware_evidence = self.get_hardware_evidence()
+          hw_report = hardware_evidence.hardware_report
+          runtime_data = hardware_evidence.runtime_data
+          
+          if isolation_type == IsolationType.SEV_SNP:
+            imds_client = ImdsClient(self.log)
+            cert_chain = imds_client.get_vcek_certificate()
+            isolation_evidence = SnpEvidence(hw_report, runtime_data, cert_chain)
+          else:  # TDX
+            isolation_evidence = TdxEvidence(hw_report, runtime_data)
+
         else:
-          self.log.info(f'Unsupported isolation type: {isolation_type}')
+          self.log.error(f'Unsupported isolation type: {isolation_type}')
           raise UnsupportedReportTypeException(f"Unsupported isolation type: {isolation_type}")
 
         # Collect guest attestation parameters
