@@ -1,1 +1,1 @@
-docker build --pull -f Dockerfile.runtime -t python-web-api-slim ..
+docker build --pull --no-cache -f Dockerfile -t pygentvmcvm ..

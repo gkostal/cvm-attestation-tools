@@ -4,5 +4,5 @@
 
 call az acr login --name gnkdev
 
-docker tag python-web-api-slim  gnkdev.azurecr.io/python-web-api-slim:latest
-docker push gnkdev.azurecr.io/python-web-api-slim:latest
+docker tag pygentvmcvm  gnkdev.azurecr.io/pygentvmcvm:latest
+docker push gnkdev.azurecr.io/pygentvmcvm:latest

@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: pygencvm-deployment
+  name: pygencvm2-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: pygencvm-containers
+      app: pygencvm2-containers
   template:
     metadata:
       labels:
-        app: pygencvm-containers
+        app: pygencvm2-containers
     spec:
       containers:
-      - name: pygencvm-container
+      - name: pygencvm2-container
         image: gnkdev.azurecr.io/pygentvmcvm
         imagePullPolicy: Always
         ports:
@@ -32,18 +32,18 @@ spec:
           path: /sys/kernel/security
           type: Directory
       nodeSelector:
-        agentpool: amdcvmpool
+        agentpool: amdcvmpool2
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: pygencvm-service
+  name: pygencvm2-service
   annotations:
     service.beta.kubernetes.io/azure-load-balancer-internal: "true"
 spec:
   type: LoadBalancer
   ports:
-  - port: 50060
+  - port: 50070
     targetPort: 5000
   selector:
-    app: pygencvm-containers
+    app: pygencvm2-containers

@@ -8,6 +8,7 @@ import os
 import json
 import base64
 from typing import Optional
+import threading
 
 # Add the cvm-attestation directory to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'cvm-attestation'))
@@ -20,6 +21,8 @@ from AttestationClient import AttestationClient, AttestationClientParameters, Ve
 from src.Isolation import IsolationType
 from memory_logger import MemoryLogger
 
+# Global mutex to ensure only one attestation request runs at a time
+request_lock = threading.Lock()
 
 # Create Flask app
 app = Flask(__name__)
@@ -174,37 +177,39 @@ class AttestGuest(Resource):
             endpoint = data['endpoint']
             isolation_type = data['isolation_type']
             claims = data.get('claims')
-            
-            # Create attestation client
-            client, logger, error = create_attestation_client(endpoint, isolation_type, claims)
-            
-            if error:
-                return {
-                    'success': False,
-                    'error': error,
-                    'logs': logger.get_logs()
-                }, 400
-            
-            # Perform guest attestation
-            try:
-                result = client.attest_guest()
+
+            # Serialize the attestation operation
+            with request_lock:
+                # Create attestation client
+                client, logger, error = create_attestation_client(endpoint, isolation_type, claims)
                 
-                if result is None:
+                if error:
                     return {
                         'success': False,
-                        'error': 'Guest attestation failed - no token received',
+                        'error': error,
+                        'logs': logger.get_logs()
+                    }, 400
+                
+                # Perform guest attestation
+                try:
+                    result = client.attest_guest()
+                    
+                    if result is None:
+                        return {
+                            'success': False,
+                            'error': 'Guest attestation failed - no token received',
+                            'logs': logger.get_logs()
+                        }, 500
+                    
+                    return handle_bytes_response(result, logger)
+                    
+                except Exception as e:
+                    logger.error(f"Guest attestation failed: {str(e)}")
+                    return {
+                        'success': False,
+                        'error': f'Guest attestation failed: {str(e)}',
                         'logs': logger.get_logs()
                     }, 500
-                
-                return handle_bytes_response(result, logger)
-                
-            except Exception as e:
-                logger.error(f"Guest attestation failed: {str(e)}")
-                return {
-                    'success': False,
-                    'error': f'Guest attestation failed: {str(e)}',
-                    'logs': logger.get_logs()
-                }, 500
                 
         except Exception as e:
             return {
@@ -241,37 +246,39 @@ class AttestPlatform(Resource):
             endpoint = data['endpoint']
             isolation_type = data['isolation_type']
             claims = data.get('claims')
-            
-            # Create attestation client
-            client, logger, error = create_attestation_client(endpoint, isolation_type, claims)
-            
-            if error:
-                return {
-                    'success': False,
-                    'error': error,
-                    'logs': logger.get_logs()
-                }, 400
-            
-            # Perform platform attestation
-            try:
-                result = client.attest_platform()
+
+            # Serialize the attestation operation
+            with request_lock:
+                # Create attestation client
+                client, logger, error = create_attestation_client(endpoint, isolation_type, claims)
                 
-                if result is None:
+                if error:
                     return {
                         'success': False,
-                        'error': 'Platform attestation failed - no token received',
+                        'error': error,
+                        'logs': logger.get_logs()
+                    }, 400
+                
+                # Perform platform attestation
+                try:
+                    result = client.attest_platform()
+                    
+                    if result is None:
+                        return {
+                            'success': False,
+                            'error': 'Platform attestation failed - no token received',
+                            'logs': logger.get_logs()
+                        }, 500
+                    
+                    return handle_bytes_response(result, logger)
+                    
+                except Exception as e:
+                    logger.error(f"Platform attestation failed: {str(e)}")
+                    return {
+                        'success': False,
+                        'error': f'Platform attestation failed: {str(e)}',
                         'logs': logger.get_logs()
                     }, 500
-                
-                return handle_bytes_response(result, logger)
-                
-            except Exception as e:
-                logger.error(f"Platform attestation failed: {str(e)}")
-                return {
-                    'success': False,
-                    'error': f'Platform attestation failed: {str(e)}',
-                    'logs': logger.get_logs()
-                }, 500
                 
         except Exception as e:
             return {
@@ -308,48 +315,50 @@ class GetHardwareEvidence(Resource):
             endpoint = data['endpoint']
             isolation_type = data['isolation_type']
             claims = data.get('claims')
-            
-            # Create attestation client
-            client, logger, error = create_attestation_client(endpoint, isolation_type, claims)
-            
-            if error:
-                return {
-                    'success': False,
-                    'error': error,
-                    'logs': logger.get_logs()
-                }, 400
-            
-            # Get hardware evidence
-            try:
-                evidence = client.get_hardware_evidence()
+
+            # Serialize the evidence retrieval
+            with request_lock:
+                # Create attestation client
+                client, logger, error = create_attestation_client(endpoint, isolation_type, claims)
                 
-                if evidence is None:
+                if error:
                     return {
                         'success': False,
-                        'error': 'Failed to get hardware evidence',
+                        'error': error,
+                        'logs': logger.get_logs()
+                    }, 400
+                
+                # Get hardware evidence
+                try:
+                    evidence = client.get_hardware_evidence()
+                    
+                    if evidence is None:
+                        return {
+                            'success': False,
+                            'error': 'Failed to get hardware evidence',
+                            'logs': logger.get_logs()
+                        }, 500
+                    
+                    # Convert hardware evidence to JSON-serializable format
+                    evidence_data = {
+                        'type': evidence.type,
+                        'hardware_report': base64.b64encode(evidence.hardware_report).decode('utf-8'),
+                        'runtime_data': base64.b64encode(evidence.runtime_data).decode('utf-8')
+                    }
+                    
+                    return {
+                        'success': True,
+                        'evidence': evidence_data,
+                        'logs': logger.get_logs()
+                    }
+                    
+                except Exception as e:
+                    logger.error(f"Failed to get hardware evidence: {str(e)}")
+                    return {
+                        'success': False,
+                        'error': f'Failed to get hardware evidence: {str(e)}',
                         'logs': logger.get_logs()
                     }, 500
-                
-                # Convert hardware evidence to JSON-serializable format
-                evidence_data = {
-                    'type': evidence.type,
-                    'hardware_report': base64.b64encode(evidence.hardware_report).decode('utf-8'),
-                    'runtime_data': base64.b64encode(evidence.runtime_data).decode('utf-8')
-                }
-                
-                return {
-                    'success': True,
-                    'evidence': evidence_data,
-                    'logs': logger.get_logs()
-                }
-                
-            except Exception as e:
-                logger.error(f"Failed to get hardware evidence: {str(e)}")
-                return {
-                    'success': False,
-                    'error': f'Failed to get hardware evidence: {str(e)}',
-                    'logs': logger.get_logs()
-                }, 500
                 
         except Exception as e:
             return {

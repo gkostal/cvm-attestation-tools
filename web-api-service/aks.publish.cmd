@@ -2,6 +2,8 @@
 
 kubectl delete deployment pygentvm-deployment
 kubectl delete deployment pygencvm-deployment
+kubectl delete deployment pygencvm2-deployment
 
 kubectl apply -f pygentvm.yaml
 kubectl apply -f pygencvm.yaml
+kubectl apply -f pygencvm2.yaml

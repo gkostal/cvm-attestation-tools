@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: pygentvm-container
-        image: gnkdev.azurecr.io/python-web-api-slim
+        image: gnkdev.azurecr.io/pygentvmcvm
         imagePullPolicy: Always
         ports:
         - containerPort: 50052
