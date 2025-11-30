@@ -63,9 +63,10 @@ def test_attest_platform_success_snp(
   mock_attestation_provider_instance.attest_platform.return_value = "mock_token"
   attestation_client.provider = mock_attestation_provider_instance
 
-  encoded_token = attestation_client.attest_platform()
+  encoded_token, platform_evidence = attestation_client.attest_platform()
 
   assert encoded_token == "mock_token"
+  assert platform_evidence is not None
   attestation_client.log.info.assert_any_call('Attesting Platform Evidence...')
   attestation_client.log.info.assert_any_call('TOKEN:')
   attestation_client.log.info.assert_any_call("mock_token")
@@ -103,9 +104,10 @@ def test_attest_platform_success_tdx(
   mock_attestation_provider_instance.attest_platform.return_value = "mock_token"
   attestation_client.provider = mock_attestation_provider_instance
 
-  encoded_token = attestation_client.attest_platform()
+  encoded_token, platform_evidence = attestation_client.attest_platform()
 
   assert encoded_token == "mock_token"
+  assert platform_evidence is not None
   attestation_client.log.info.assert_any_call('Attesting Platform Evidence...')
   attestation_client.log.info.assert_any_call('TOKEN:')
   attestation_client.log.info.assert_any_call("mock_token")

@@ -4,6 +4,7 @@
 import json
 import click
 import hashlib
+import logging
 from src.attestation_client import AttestationClient, AttestationClientParameters, Verifier
 from src.isolation import IsolationType
 from src.logger import Logger
@@ -70,9 +71,18 @@ def get_endpoint(logger, isolation_type: IsolationType, attestation_type: str):
   help='Attestation type: Guest or Platform (Default)'
 )
 @click.option('--s', is_flag=True, help="Save hardware evidence to files.")
-def attest(c, t, s):
+@click.option('--v', is_flag=True, help="Enable verbose logging (includes evidence)")
+def attest(c, t, s, v):
   # create a new console logger
   logger = Logger('logger').get_logger()
+  
+  # Set logger level based on --v flag
+  if v:
+    logger.setLevel(logging.DEBUG)
+    logger.info("Verbose logging ENABLED - evidence will be logged")
+  else:
+    logger.setLevel(logging.INFO)
+  
   logger.info("Attestation started...")
   logger.info(f"Reading config file: {c}")
 
@@ -114,7 +124,8 @@ def attest(c, t, s):
   attestation_client = AttestationClient(logger, client_parameters)
   if attestation_type in ATTESTATION_METHODS:
     method_name = ATTESTATION_METHODS[attestation_type]
-    token = getattr(attestation_client, method_name)()
+    # Methods always return (token, evidence) tuple
+    token, evidence = getattr(attestation_client, method_name)()
   else:
     raise AttestException(f"Invalid parameter for attestation type: '{attestation_type}'. \
                           Supported types: {', '.join(ATTESTATION_METHODS.keys())}")

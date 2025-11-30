@@ -41,11 +41,12 @@ def test_get_endpoint(mock_logger, mocker):
   assert endpoint == "https://west_europe.test.com"
 
 def test_attestation_success(mock_logger, mock_attestation_client, mock_parse_config_file, mocker):
-  mock_attestation_client.attest_guest.return_value = "mock-token"
+  mock_attestation_client.attest_guest.return_value = ("mock-token", {"evidence": "data"})
 
   with patch("attest.AttestationClient", return_value=mock_attestation_client):
-    token = mock_attestation_client.attest_guest()
+    token, evidence = mock_attestation_client.attest_guest()
     assert token == "mock-token"
+    assert evidence == {"evidence": "data"}
 
 
 def test_attest_successfully():
