@@ -97,6 +97,9 @@ pip3 uninstall read_report -y
 ## attest
 Tool to attest the CVM
 
+### `--v` Verbose Logging Option
+Option to enable verbose logging (including the attestation evidence itself)
+
 ### `--c` Config File Option
 Option to set config file
 
