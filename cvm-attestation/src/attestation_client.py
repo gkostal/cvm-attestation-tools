@@ -15,7 +15,7 @@ from src.isolation import IsolationType, Isolation, TdxEvidence, SnpEvidence, Tr
 from src.logger import Logger
 from src.report_parser import ReportParser
 from src.imds_client import ImdsClient
-from src.attestation_provider import MAAProvider, ITAProvider
+from src.attestation_provider import MAAProvider, ITAProvider, validate_max_retries
 from src.attestation_types import TpmInfo
 from src.measurements import get_measurements
 from src.encoder import Encoder
@@ -144,6 +144,9 @@ class AttestationClientParameters:
       Optional user claims. Either a JSON-serializable value (typically a dict),
       whose json.dumps() output is bound into the hardware report, or
       bytes/bytearray holding UTF-8 encoded JSON, which are bound exactly as given.
+    max_retries
+      Maximum number of attempts (1 means no retries). Applies to collecting and
+      submitting evidence, and to each MAA request.
     """
     # Validate the isolation type
     if not isinstance(isolation_type, IsolationType):
@@ -154,6 +157,7 @@ class AttestationClientParameters:
       raise ValueError(f"Unsupported verifier type: {verifier}. Supported types: {list(Verifier)}")
 
     validate_claims(claims)
+    validate_max_retries(max_retries)
 
     self.endpoint = endpoint
     self.verifier = verifier
@@ -176,7 +180,7 @@ class AttestationClient():
     self.log = logger
 
     if verifier == Verifier.MAA:
-      self.provider = MAAProvider(logger, parameters.isolation_type, endpoint)
+      self.provider = MAAProvider(logger, parameters.isolation_type, endpoint, parameters.max_retries)
     elif verifier == Verifier.ITA:
       self.provider = ITAProvider(logger, parameters.isolation_type, endpoint, api_key)
     else:

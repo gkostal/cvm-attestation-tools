@@ -300,3 +300,16 @@ def test_collect_platform_evidence_snp_without_calling_provider(mocker):
   assert evidence['report_type'] == 'SEV_SNP'
   assert evidence['hw_evidence'] == SnpFormatter.format_snp_evidence(b'hw_report', b'vcek_cert_chain')
   client.provider.attest_platform.assert_not_called()
+
+
+def test_max_retries_is_passed_to_maa_provider():
+  parameters = AttestationClientParameters(
+    "https://test.attest.azure.net", Verifier.MAA, IsolationType.SEV_SNP, max_retries=3)
+  assert AttestationClient(MagicMock(), parameters).provider.max_retries == 3
+
+
+@pytest.mark.parametrize("max_retries", [0, -1, None])
+def test_invalid_max_retries_is_rejected(max_retries):
+  with pytest.raises(ValueError):
+    AttestationClientParameters(
+      "https://test.attest.azure.net", Verifier.MAA, IsolationType.SEV_SNP, max_retries=max_retries)
