@@ -19,6 +19,7 @@ from src.measurements import get_measurements
 from src.encoder import Encoder
 from src.tpm_wrapper import TssWrapper
 from src.snp_utils import SnpFormatter
+from src.claims import validate_claims, claims_to_client_payload
 from requests.exceptions import RequestException
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -86,7 +87,15 @@ class Verifier(Enum):
 
 
 class AttestationClientParameters:
-  def __init__(self, endpoint: str, verifier: Verifier, isolation_type: IsolationType, claims = None, api_key = None, claims_are_base64url_encoded: bool = False, max_retries: int = 5):
+  def __init__(self, endpoint: str, verifier: Verifier, isolation_type: IsolationType, claims = None, api_key = None, max_retries: int = 5):
+    """
+    Parameters
+    ----------
+    claims
+      Optional user claims. Either a JSON-serializable value (typically a dict),
+      whose json.dumps() output is bound into the hardware report, or
+      bytes/bytearray holding UTF-8 encoded JSON, which are bound exactly as given.
+    """
     # Validate the isolation type
     if not isinstance(isolation_type, IsolationType):
       raise ValueError(f"Unsupported isolation type: {isolation_type}. Supported types: {list(IsolationType)}")
@@ -95,12 +104,13 @@ class AttestationClientParameters:
     if not isinstance(verifier, Verifier):
       raise ValueError(f"Unsupported verifier type: {verifier}. Supported types: {list(Verifier)}")
 
+    validate_claims(claims)
+
     self.endpoint = endpoint
     self.verifier = verifier
     self.api_key = api_key
     self.isolation_type = isolation_type
     self.user_claims = claims
-    self.claims_are_base64url_encoded = claims_are_base64url_encoded
     self.max_retries = max_retries
 
 class UnsupportedReportTypeException(Exception):
@@ -139,7 +149,7 @@ class AttestationClient():
 
       # Extract Hardware Report and Runtime Data
       tss_wrapper = TssWrapper(self.log)
-      hcl_report = tss_wrapper.get_hcl_report(self.parameters.user_claims, self.parameters.claims_are_base64url_encoded)
+      hcl_report = tss_wrapper.get_hcl_report(self.parameters.user_claims)
       report_type = ReportParser.extract_report_type(hcl_report)
       hw_report = ReportParser.extract_hw_report(hcl_report)
       runtime_data = ReportParser.extract_runtimes_data(hcl_report)
@@ -182,7 +192,7 @@ class AttestationClient():
       tss_wrapper = TssWrapper(self.log)
 
       # Extract Hardware Report and Runtime Data
-      hcl_report = tss_wrapper.get_hcl_report(self.parameters.user_claims, self.parameters.claims_are_base64url_encoded)
+      hcl_report = tss_wrapper.get_hcl_report(self.parameters.user_claims)
       report_type = ReportParser.extract_report_type(hcl_report)
       runtime_data = ReportParser.extract_runtimes_data(hcl_report)
       hw_report = ReportParser.extract_hw_report(hcl_report)
@@ -300,26 +310,9 @@ class AttestationClient():
       tcg_logs = get_measurements(os_info.type)
       isolation = Isolation(self.parameters.isolation_type, isolation_evidence)
 
-      # Decode user claims if they are base64url-encoded (V2 API)
-      user_claims_for_payload = self.parameters.user_claims
-      if self.parameters.claims_are_base64url_encoded and self.parameters.user_claims:
-        try:
-          # Add padding if needed
-          padding = 4 - (len(self.parameters.user_claims) % 4)
-          if padding != 4:
-            padded_claims = self.parameters.user_claims + ('=' * padding)
-          else:
-            padded_claims = self.parameters.user_claims
-          # Decode from base64url and parse JSON
-          decoded_bytes = urlsafe_b64decode(padded_claims)
-          user_claims_for_payload = json.loads(decoded_bytes.decode('utf-8'))
-          self.log.info(f"Decoded V2 user claims: {user_claims_for_payload}")
-        except Exception as e:
-          self.log.error(f"Failed to decode base64url claims: {e}")
-          # Fall back to original claims
-          user_claims_for_payload = self.parameters.user_claims
+      client_payload = claims_to_client_payload(self.parameters.user_claims)
 
-      param = GuestAttestationParameters(os_info, tcg_logs, tpm_info, isolation, user_claims_for_payload)
+      param = GuestAttestationParameters(os_info, tcg_logs, tpm_info, isolation, client_payload)
 
       # Prepare guest evidence to return
       guest_attestation_json = json.loads(param.toJson())
@@ -408,26 +401,9 @@ class AttestationClient():
         tcg_logs = get_measurements(os_info.type)
         isolation = Isolation(self.parameters.isolation_type, isolation_evidence)
 
-        # Decode user claims if they are base64url-encoded (V2 API)
-        user_claims_for_payload = self.parameters.user_claims
-        if self.parameters.claims_are_base64url_encoded and self.parameters.user_claims:
-          try:
-            # Add padding if needed
-            padding = 4 - (len(self.parameters.user_claims) % 4)
-            if padding != 4:
-              padded_claims = self.parameters.user_claims + ('=' * padding)
-            else:
-              padded_claims = self.parameters.user_claims
-            # Decode from base64url and parse JSON
-            decoded_bytes = urlsafe_b64decode(padded_claims)
-            user_claims_for_payload = json.loads(decoded_bytes.decode('utf-8'))
-            self.log.info(f"Decoded V2 user claims: {user_claims_for_payload}")
-          except Exception as e:
-            self.log.error(f"Failed to decode base64url claims: {e}")
-            # Fall back to original claims
-            user_claims_for_payload = self.parameters.user_claims
+        client_payload = claims_to_client_payload(self.parameters.user_claims)
 
-        param = GuestAttestationParameters(os_info, tcg_logs, tpm_info, isolation, user_claims_for_payload)
+        param = GuestAttestationParameters(os_info, tcg_logs, tpm_info, isolation, client_payload)
 
         # Calls attestation provider with the guest evidence
         request = {
@@ -546,7 +522,7 @@ class AttestationClient():
         tss_wrapper = TssWrapper(self.log)
 
         # Extract Hardware Report and Runtime Data
-        hcl_report = tss_wrapper.get_hcl_report(self.parameters.user_claims, self.parameters.claims_are_base64url_encoded)
+        hcl_report = tss_wrapper.get_hcl_report(self.parameters.user_claims)
         report_type = ReportParser.extract_report_type(hcl_report)
         runtime_data = ReportParser.extract_runtimes_data(hcl_report)
         hw_report = ReportParser.extract_hw_report(hcl_report)

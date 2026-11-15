@@ -21,7 +21,6 @@ def attestation_client(mock_report_parser, mock_tss_wrapper, mocker):
   # Mock the parameters
   parameters_mock = mocker.Mock()
   parameters_mock.user_claims = "mock_user_claims"
-  parameters_mock.claims_are_base64url_encoded = False
   parameters_mock.max_retries = 5
 
   # Mock TssWrapper and ReportParser calls during initialization
