@@ -87,14 +87,14 @@ def get_endpoint(logger, isolation_type: IsolationType, attestation_type: str):
 def attest(c, t, s, v):
   # create a new console logger
   logger = Logger('logger').get_logger()
-  
-  # Set logger level based on --v flag
+
+  # Debug output, including the full evidence, is only logged with --v
   if v:
     logger.setLevel(logging.DEBUG)
-    logger.info("Verbose logging ENABLED - evidence will be logged")
+    logger.info("Verbose logging enabled - evidence will be logged")
   else:
     logger.setLevel(logging.INFO)
-  
+
   logger.info("Attestation started...")
   logger.info(f"Reading config file: {c}")
 

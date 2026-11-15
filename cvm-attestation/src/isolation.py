@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-import json
 from enum import Enum
 from src.encoder import Encoder
 from src.snp_utils import SnpFormatter
