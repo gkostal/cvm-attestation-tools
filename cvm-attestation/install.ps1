@@ -7,13 +7,8 @@ function Install-Chocolatey {
     Write-Output "Install-Chocolatey...Done"
 }
 
-function Install-Python {
-    Write-Output "Starting Install-Python..."
-    choco install -y python --version 3.10.2
-
-    $pythonPath = "C:\Python310"
-    $env:PATH = "$pythonPath;" + $env:PATH
-
+function Install-ModuleDependencies {
+    Write-Output "Starting Install-ModuleDependencies..."
     python.exe -m pip install --upgrade pip
     python.exe -m pip install --upgrade setuptools
     python.exe -m pip install setuptools_scm build
@@ -21,6 +16,16 @@ function Install-Python {
     python.exe -m pip install -r .\requirements.txt
 
     git submodule update --init --recursive
+    Write-Output "Install-ModuleDependencies...Done"
+}
+
+function Install-Python {
+    Write-Output "Starting Install-Python..."
+    choco install -y python --version 3.12.8
+
+    $pythonPath = "C:\Python312"
+    $env:PATH = "$pythonPath;" + $env:PATH
+
     Write-Output "Install-Python...Done"
 }
 
@@ -40,15 +45,35 @@ function Build-And-Install {
     }
 
     # Update PATH for attest CLI
-    $attestPath = "C:\Python310\Scripts"
+    $attestPath = "C:\Python312\Scripts"
     $env:PATH = "$attestPath;" + $env:PATH
 
     Write-Output "Building and Installing...Done"
 }
 
+function Test-Python312Installed {
+    try {
+        $pythonVersion = python.exe --version 2>&1
+        if ($LASTEXITCODE -eq 0 -and $pythonVersion -match "Python 3\.12") {
+            Write-Host "Python 3.12 is already installed: $pythonVersion"
+            return $true
+        }
+    } catch {
+        Write-Host "Python not found in PATH"
+    }
+    return $false
+}
+
 function run {
-    Install-Chocolatey
-    Install-Python
+    $python312Installed = Test-Python312Installed
+
+    if (-not $python312Installed) {
+        Install-Chocolatey
+        Install-Python
+    } else {
+        Write-Output "Skipping Chocolatey and Python installation..."
+    }
+    Install-ModuleDependencies
     Build-And-Install
 }
 
