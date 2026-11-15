@@ -118,11 +118,22 @@ class TssWrapper:
     return outPub.toBytes()
 
 
-  def get_hcl_report(self, user_data):
+  def get_hcl_report(self, user_data, claims_are_base64url_encoded=False):
     self.log.info('Getting hcl report from vTPM...')
 
     if user_data:
-      hash_bytes = sha512(json.dumps(user_data).encode('utf-8')).digest()
+      if claims_are_base64url_encoded:
+        # V2 path: user_data is a base64url string, decode to get exact bytes for SHA512
+        from base64 import urlsafe_b64decode
+        # Add padding if needed (base64url may have stripped padding)
+        padding = 4 - (len(user_data) % 4)
+        if padding != 4:
+          user_data += '=' * padding
+        hash_bytes = sha512(urlsafe_b64decode(user_data)).digest()
+      else:
+        # V1 path: user_data is a dict/object, hash the JSON representation
+        hash_bytes = sha512(json.dumps(user_data).encode('utf-8')).digest()
+      
       self.write_to_nv_index(HCL_USER_DATA_INDEX, hash_bytes)
 
     # read hcl report from nv index

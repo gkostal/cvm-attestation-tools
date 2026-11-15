@@ -86,7 +86,7 @@ class Verifier(Enum):
 
 
 class AttestationClientParameters:
-  def __init__(self, endpoint: str, verifier: Verifier, isolation_type: IsolationType, claims = None, api_key = None):
+  def __init__(self, endpoint: str, verifier: Verifier, isolation_type: IsolationType, claims = None, api_key = None, claims_are_base64url_encoded: bool = False, max_retries: int = 5):
     # Validate the isolation type
     if not isinstance(isolation_type, IsolationType):
       raise ValueError(f"Unsupported isolation type: {isolation_type}. Supported types: {list(IsolationType)}")
@@ -100,6 +100,8 @@ class AttestationClientParameters:
     self.api_key = api_key
     self.isolation_type = isolation_type
     self.user_claims = claims
+    self.claims_are_base64url_encoded = claims_are_base64url_encoded
+    self.max_retries = max_retries
 
 class UnsupportedReportTypeException(Exception):
   pass
@@ -113,6 +115,7 @@ class AttestationClient():
 
     self.parameters = parameters
     self.log = logger
+    self.max_retries = parameters.max_retries
 
     if verifier == Verifier.MAA:
       self.provider = MAAProvider(logger, parameters.isolation_type, endpoint)
@@ -136,7 +139,7 @@ class AttestationClient():
 
       # Extract Hardware Report and Runtime Data
       tss_wrapper = TssWrapper(self.log)
-      hcl_report = tss_wrapper.get_hcl_report(self.parameters.user_claims)
+      hcl_report = tss_wrapper.get_hcl_report(self.parameters.user_claims, self.parameters.claims_are_base64url_encoded)
       report_type = ReportParser.extract_report_type(hcl_report)
       hw_report = ReportParser.extract_hw_report(hcl_report)
       runtime_data = ReportParser.extract_runtimes_data(hcl_report)
@@ -162,13 +165,183 @@ class AttestationClient():
     except Exception as e:
       self.log.error(f"Error while reading hardware report. Exception {e}")
 
+  def collect_platform_evidence(self):
+    """
+    Collect platform evidence without performing remote attestation.
+    This method extracts the evidence collection logic from attest_platform()
+    and returns the platform evidence structure without calling the attestation provider.
+
+    Returns
+    -------
+    dict
+      Platform evidence containing hw_evidence, runtime_data, and report_type
+    """
+    try:
+      self.log.info('Collecting Platform Evidence (no attestation)...')
+
+      tss_wrapper = TssWrapper(self.log)
+
+      # Extract Hardware Report and Runtime Data
+      hcl_report = tss_wrapper.get_hcl_report(self.parameters.user_claims, self.parameters.claims_are_base64url_encoded)
+      report_type = ReportParser.extract_report_type(hcl_report)
+      runtime_data = ReportParser.extract_runtimes_data(hcl_report)
+      hw_report = ReportParser.extract_hw_report(hcl_report)
+
+      # Set request data based on the platform
+      encoded_report = Encoder.base64url_encode(hw_report)
+      encoded_runtime_data = Encoder.base64url_encode(runtime_data)
+      encoded_hw_evidence = ""
+
+      imds_client = ImdsClient(self.log)
+      if report_type == IsolationType.TDX:
+        encoded_hw_evidence = imds_client.get_td_quote(encoded_report)
+      elif report_type == IsolationType.SEV_SNP:
+        # Logs important SNP fields from the hardware report
+        self.log_snp_report(hw_report)
+
+        # Use SnpFormatter to create consistent SNP evidence format
+        cert_chain = imds_client.get_vcek_certificate()
+        encoded_hw_evidence = SnpFormatter.format_snp_evidence(hw_report, cert_chain)
+      else:
+        self.log.error('Invalid Hardware Report Type')
+        raise UnsupportedReportTypeException(f"Unsupported report type: {report_type}")
+
+      # Log evidence collection completion
+      self.log.info(f'Hardware evidence size: {len(encoded_hw_evidence)} bytes')
+      self.log.info(f'Runtime data size: {len(encoded_runtime_data)} bytes')
+      self.log.debug(f'Hardware evidence (full): {encoded_hw_evidence}')
+      self.log.debug(f'Runtime data (full): {encoded_runtime_data}')
+
+      # Prepare platform evidence to return
+      platform_evidence = {
+        'hw_evidence': encoded_hw_evidence,
+        'runtime_data': encoded_runtime_data,
+        'report_type': report_type.name
+      }
+
+      self.log.info('Platform evidence collection completed successfully')
+      return platform_evidence
+
+    except Exception as e:
+      self.log.error(f"Failed to collect platform evidence: {e}")
+      raise
+
+  def collect_guest_evidence(self):
+    """
+    Collect guest evidence without performing remote attestation.
+    This method extracts the evidence collection logic from attest_guest()
+    and returns the guest evidence structure without calling the attestation provider.
+
+    Returns
+    -------
+    dict
+      Guest evidence containing attestation_info and platform_evidence (conditional)
+    """
+    try:
+      self.log.info('Collecting Guest Evidence (no attestation)...')
+
+      # Get the isolation information for the platform
+      isolation_type = self.parameters.isolation_type
+      self.log.info(f'Processing {isolation_type.name} evidence collection...')
+
+      # Get isolation evidence based on type
+      # Also capture platform evidence for later return
+      platform_evidence = None
+      
+      if isolation_type == IsolationType.TRUSTED_LAUNCH:
+        # Trusted Launch specific code
+        isolation_evidence = TrustedLaunchEvidence()
+
+      elif isolation_type in [IsolationType.SEV_SNP, IsolationType.TDX]:
+        # Get hardware evidence for CVM types (SEV_SNP and TDX)
+        hardware_evidence = self.get_hardware_evidence()
+        hw_report = hardware_evidence.hardware_report
+        runtime_data = hardware_evidence.runtime_data
+        
+        if isolation_type == IsolationType.SEV_SNP:
+          # For SEV_SNP: fetch VCEK cert chain and format with SnpFormatter
+          imds_client = ImdsClient(self.log)
+          cert_chain = imds_client.get_vcek_certificate()
+          
+          # Use SnpFormatter to create consistent SNP evidence format (includes cert chain)
+          encoded_hw_evidence = SnpFormatter.format_snp_evidence(hw_report, cert_chain)
+          
+          # Capture platform evidence for return (now includes cert chain!)
+          platform_evidence = {
+            'hw_evidence': encoded_hw_evidence,
+            'runtime_data': Encoder.base64url_encode(runtime_data),
+            'report_type': isolation_type.name
+          }
+          
+          isolation_evidence = SnpEvidence(hw_report, runtime_data, cert_chain)
+        else:  # TDX
+          # For TDX: hw_report is already the TD quote from IMDS
+          platform_evidence = {
+            'hw_evidence': Encoder.base64url_encode(hw_report),
+            'runtime_data': Encoder.base64url_encode(runtime_data),
+            'report_type': isolation_type.name
+          }
+          
+          isolation_evidence = TdxEvidence(hw_report, runtime_data)
+
+      else:
+        self.log.error(f'Unsupported isolation type: {isolation_type}')
+        raise UnsupportedReportTypeException(f"Unsupported isolation type: {isolation_type}")
+
+      # Collect guest attestation parameters
+      os_info = OsInfo()
+      tss_wrapper = TssWrapper(self.log)
+      aik_cert = tss_wrapper.get_aik_cert()
+      aik_pub = tss_wrapper.get_aik_pub()
+      pcr_quote, sig = tss_wrapper.get_pcr_quote(os_info.pcr_list)
+      pcr_values = tss_wrapper.get_pcr_values(os_info.pcr_list)
+      key, key_handle, tpm = tss_wrapper.get_ephemeral_key(os_info.pcr_list)
+      tpm_info = TpmInfo(aik_cert, aik_pub, pcr_quote, sig, pcr_values, key)
+      tcg_logs = get_measurements(os_info.type)
+      isolation = Isolation(self.parameters.isolation_type, isolation_evidence)
+
+      # Decode user claims if they are base64url-encoded (V2 API)
+      user_claims_for_payload = self.parameters.user_claims
+      if self.parameters.claims_are_base64url_encoded and self.parameters.user_claims:
+        try:
+          # Add padding if needed
+          padding = 4 - (len(self.parameters.user_claims) % 4)
+          if padding != 4:
+            padded_claims = self.parameters.user_claims + ('=' * padding)
+          else:
+            padded_claims = self.parameters.user_claims
+          # Decode from base64url and parse JSON
+          decoded_bytes = urlsafe_b64decode(padded_claims)
+          user_claims_for_payload = json.loads(decoded_bytes.decode('utf-8'))
+          self.log.info(f"Decoded V2 user claims: {user_claims_for_payload}")
+        except Exception as e:
+          self.log.error(f"Failed to decode base64url claims: {e}")
+          # Fall back to original claims
+          user_claims_for_payload = self.parameters.user_claims
+
+      param = GuestAttestationParameters(os_info, tcg_logs, tpm_info, isolation, user_claims_for_payload)
+
+      # Prepare guest evidence to return
+      guest_attestation_json = json.loads(param.toJson())
+      guest_evidence = {
+        'attestation_info': guest_attestation_json,
+        'platform_evidence': platform_evidence
+      }
+
+      self.log.info('Guest evidence collection completed successfully')
+      return guest_evidence
+
+    except Exception as e:
+      self.log.error(f"Failed to collect guest evidence: {e}")
+      raise
+
   def attest_guest(self):
     """
     Attest the Hardware and Guest
     """
 
     # Attest the platform using exponential backoff
-    max_retries = 5
+    max_retries = self.max_retries
     retries = 0
     backoff_factor = 1
     while retries < max_retries:
@@ -234,7 +407,27 @@ class AttestationClient():
         tpm_info = TpmInfo(aik_cert, aik_pub, pcr_quote, sig, pcr_values, key)
         tcg_logs = get_measurements(os_info.type)
         isolation = Isolation(self.parameters.isolation_type, isolation_evidence)
-        param = GuestAttestationParameters(os_info, tcg_logs, tpm_info, isolation, self.parameters.user_claims)
+
+        # Decode user claims if they are base64url-encoded (V2 API)
+        user_claims_for_payload = self.parameters.user_claims
+        if self.parameters.claims_are_base64url_encoded and self.parameters.user_claims:
+          try:
+            # Add padding if needed
+            padding = 4 - (len(self.parameters.user_claims) % 4)
+            if padding != 4:
+              padded_claims = self.parameters.user_claims + ('=' * padding)
+            else:
+              padded_claims = self.parameters.user_claims
+            # Decode from base64url and parse JSON
+            decoded_bytes = urlsafe_b64decode(padded_claims)
+            user_claims_for_payload = json.loads(decoded_bytes.decode('utf-8'))
+            self.log.info(f"Decoded V2 user claims: {user_claims_for_payload}")
+          except Exception as e:
+            self.log.error(f"Failed to decode base64url claims: {e}")
+            # Fall back to original claims
+            user_claims_for_payload = self.parameters.user_claims
+
+        param = GuestAttestationParameters(os_info, tcg_logs, tpm_info, isolation, user_claims_for_payload)
 
         # Calls attestation provider with the guest evidence
         request = {
@@ -343,7 +536,7 @@ class AttestationClient():
     """
 
     # Attest the platform using exponential backoff
-    max_retries = 5
+    max_retries = self.max_retries
     retries = 0
     backoff_factor = 1
     while retries < max_retries:
@@ -353,7 +546,7 @@ class AttestationClient():
         tss_wrapper = TssWrapper(self.log)
 
         # Extract Hardware Report and Runtime Data
-        hcl_report = tss_wrapper.get_hcl_report(self.parameters.user_claims)
+        hcl_report = tss_wrapper.get_hcl_report(self.parameters.user_claims, self.parameters.claims_are_base64url_encoded)
         report_type = ReportParser.extract_report_type(hcl_report)
         runtime_data = ReportParser.extract_runtimes_data(hcl_report)
         hw_report = ReportParser.extract_hw_report(hcl_report)
