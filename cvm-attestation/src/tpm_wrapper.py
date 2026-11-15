@@ -322,6 +322,16 @@ class TssWrapper:
     return ""
 
 
+  def release_ephemeral_key(self, handle, tpm):
+    """
+    Releases an ephemeral key from get_ephemeral_key() that was not used for decryption.
+    """
+    try:
+      tpm.FlushContext(handle)
+    finally:
+      tpm.close()
+
+
   def cleanSlots(self, tpm, slotType):
       caps = tpm.GetCapability(TPM_CAP.HANDLES, slotType << 24, 8)
       handles = caps.capabilityData

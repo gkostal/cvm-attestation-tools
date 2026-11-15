@@ -140,8 +140,7 @@ def attest(c, t, s, v):
   attestation_client = AttestationClient(logger, client_parameters)
   if attestation_type in ATTESTATION_METHODS:
     method_name = ATTESTATION_METHODS[attestation_type]
-    # Methods always return (token, evidence) tuple
-    token, evidence = getattr(attestation_client, method_name)()
+    token = getattr(attestation_client, method_name)()
   else:
     raise AttestException(f"Invalid parameter for attestation type: '{attestation_type}'. \
                           Supported types: {', '.join(ATTESTATION_METHODS.keys())}")

@@ -41,12 +41,11 @@ def test_get_endpoint(mock_logger, mocker):
   assert endpoint == "https://west_europe.test.com"
 
 def test_attestation_success(mock_logger, mock_attestation_client, mock_parse_config_file, mocker):
-  mock_attestation_client.attest_guest.return_value = ("mock-token", {"evidence": "data"})
+  mock_attestation_client.attest_guest.return_value = "mock-token"
 
   with patch("attest.AttestationClient", return_value=mock_attestation_client):
-    token, evidence = mock_attestation_client.attest_guest()
+    token = mock_attestation_client.attest_guest()
     assert token == "mock-token"
-    assert evidence == {"evidence": "data"}
 
 
 def test_attest_successfully():
@@ -73,8 +72,7 @@ def test_attest_fails_with_incorrect_type_option():
 def test_attest_uses_config_endpoint(mock_parse_config_file, mocker):
   mock_get_endpoint = mocker.patch("attest.get_endpoint")
   mock_params = mocker.patch("attest.AttestationClientParameters")
-  mock_client = mocker.patch("attest.AttestationClient")
-  mock_client.return_value.attest_guest.return_value = ("mock-token", {})
+  mocker.patch("attest.AttestationClient")
 
   result = CliRunner().invoke(attest, ['--c', 'somefile.json', '--t', 'Guest'])
 
@@ -87,8 +85,7 @@ def test_attest_falls_back_to_regional_endpoint(mocker):
   mocker.patch("attest.parse_config_file", return_value=config)
   mock_get_endpoint = mocker.patch("attest.get_endpoint", return_value="https://regional.test.com")
   mock_params = mocker.patch("attest.AttestationClientParameters")
-  mock_client = mocker.patch("attest.AttestationClient")
-  mock_client.return_value.attest_guest.return_value = ("mock-token", {})
+  mocker.patch("attest.AttestationClient")
 
   result = CliRunner().invoke(attest, ['--c', 'somefile.json', '--t', 'Guest'])
 
